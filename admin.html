@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin — Shelter Locator</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+html,body {
+  height:100%; margin:0; font-family:Segoe UI, Roboto, Arial, sans-serif; background:#f5f6fa;
+}
+#map {height:70%;}
+
+/* Admin Panel */
+#adminPanel {
+  padding:20px;
+  background:#fff;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  border-radius:12px;
+  width:90%;
+  max-width:400px;
+  margin:20px auto;
+}
+#adminPanel h3 {
+  margin-top:0;
+  text-align:center;
+  color:#333;
+}
+#adminPanel h4 { margin:15px 0 10px; color:#444; }
+
+/* Inputs & buttons */
+input {
+  width:100%; padding:10px; margin-top:10px;
+  border:1px solid #ccc; border-radius:8px; font-size:14px;
+  transition: border .2s;
+}
+input:focus {
+  border:1px solid #0078d7; outline:none;
+}
+
+button {
+  width:100%; padding:10px; margin-top:12px;
+  border:none; border-radius:8px; font-size:15px;
+  font-weight:600; cursor:pointer;
+  transition:background .2s;
+}
+#loginBtn, #addShelterBtn { background:#0078d7; color:#fff; }
+#loginBtn:hover, #addShelterBtn:hover { background:#005fa3; }
+
+#logoutBtn { background:#ff4757; color:#fff; }
+#logoutBtn:hover { background:#e84118; }
+
+#clearSheltersBtn { background:#ffa502; color:#fff; }
+#clearSheltersBtn:hover { background:#e67e22; }
+
+/* Form */
+#shelterForm {
+  margin-top:20px;
+  border-top:1px solid #ddd;
+  padding-top:15px;
+}
+</style>
+</head>
+<body>
+
+<link rel="manifest" href="manifest.json">
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js')
+    .then(()=>console.log("Service Worker registered"))
+    .catch(err=>console.error("SW failed:", err));
+}
+</script>
+
+<div id="adminPanel">
+  <h3>🔑 Admin Login</h3>
+  <input type="text" id="adminUser" placeholder="Username">
+  <input type="password" id="adminPass" placeholder="Password">
+  <button id="loginBtn">Login</button>
+  <button id="logoutBtn" style="display:none;">Logout</button>
+
+  <div id="shelterForm" style="display:none;">
+    <h4>🏠 Manage Shelters</h4>
+    <input type="text" id="shelterName" placeholder="Shelter Name">
+    <input type="text" id="shelterLat" placeholder="Latitude">
+    <input type="text" id="shelterLng" placeholder="Longitude">
+    <button id="addShelterBtn">Add / Update Shelter</button>
+    <button id="clearSheltersBtn">Clear All Shelters</button>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const ADMIN_USER="admin", ADMIN_PASS="1234";
+let isAdmin=false;
+
+// load shelters
+let shelters=JSON.parse(localStorage.getItem('shelters'))||[
+  {name:"malasin", coords:[16.8740,121.5952]},
+  {name:"san mateo high school", coords:[16.88988,121.5678]},
+  {name:"ncc", coords:[16.8833,121.5833]},
+  {name:"darnorte", coords:[16.8904,121.6076]}
+];
+let markers=[];
+
+// map
+const map=L.map('map').setView([16.8827,121.5945],14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+
+// render
+function renderShelters(){
+  markers.forEach(m=>map.removeLayer(m));
+  markers=[];
+  shelters.forEach(s=>{
+    const marker=L.circleMarker(s.coords,{radius:8,color:'red',fillColor:'#f03',fillOpacity:0.8})
+      .addTo(map).bindPopup(`<b>${s.name}</b>`);
+    markers.push(marker);
+  });
+}
+renderShelters();
+
+// login/logout
+document.getElementById('loginBtn').onclick=function(){
+  const u=document.getElementById('adminUser').value, p=document.getElementById('adminPass').value;
+  if(u===ADMIN_USER && p===ADMIN_PASS){
+    isAdmin=true;
+    document.getElementById('shelterForm').style.display="block";
+    this.style.display="none";
+    document.getElementById('logoutBtn').style.display="block";
+    alert("✅ Login successful!");
+  } else alert("❌ Invalid credentials");
+};
+document.getElementById('logoutBtn').onclick=function(){
+  isAdmin=false;
+  document.getElementById('shelterForm').style.display="none";
+  this.style.display="none";
+  document.getElementById('loginBtn').style.display="block";
+  alert("👋 Logged out!");
+};
+
+// add/update
+document.getElementById('addShelterBtn').onclick=function(){
+  if(!isAdmin){alert("Admin only.");return;}
+  const name=document.getElementById('shelterName').value;
+  const lat=parseFloat(document.getElementById('shelterLat').value);
+  const lng=parseFloat(document.getElementById('shelterLng').value);
+  if(!name||isNaN(lat)||isNaN(lng)){alert("Complete fields");return;}
+  const existing=shelters.find(s=>s.name===name);
+  if(existing) existing.coords=[lat,lng]; else shelters.push({name,coords:[lat,lng]});
+  localStorage.setItem('shelters',JSON.stringify(shelters));
+  renderShelters(); alert("Shelter saved!");
+};
+
+// clear
+document.getElementById('clearSheltersBtn').onclick=function(){
+  if(!isAdmin)return;
+  if(confirm("Clear all shelters?")){
+    shelters=[]; localStorage.setItem('shelters',JSON.stringify(shelters)); renderShelters();
+  }
+};
+</script>
+</body>
+</html>
+
+
